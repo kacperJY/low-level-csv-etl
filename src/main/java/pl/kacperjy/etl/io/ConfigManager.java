@@ -13,7 +13,7 @@ public class ConfigManager {
 
     private static final Path APP_CONFIG_PATH = Path.of("etl-config.properties");
 
-    private static final String DEFAULT_CONFIGURATION_PROPERTY_VALUE = "##DEFAULT";
+    private static final String DEFAULT_CONFIGURATION_PROPERTY_VALUE = "%DEFAULT%";
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigManager.class);
 
@@ -45,7 +45,7 @@ public class ConfigManager {
         for (ConfigProperties propertyName : ConfigProperties.values()) {
             String propertyValue = properties.getProperty(propertyName.getPropertyName());
             if(propertyValue == null || propertyValue.isBlank() || propertyValue.equals(DEFAULT_CONFIGURATION_PROPERTY_VALUE)){
-                String message = String.format("Cannot connect with parameter {%s} set as default value",propertyName.getPropertyName());
+                String message = String.format("Configuration cannot has parameter {%s} set as default value",propertyName.getPropertyName());
                 throw new ConfigurationException(message);
             }
         }

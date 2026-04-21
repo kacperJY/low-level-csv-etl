@@ -1,10 +1,10 @@
 <configuration debug="false">
 
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
+<!--    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">-->
+<!--        <encoder>-->
+<!--            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>-->
+<!--        </encoder>-->
+<!--    </appender>-->
 
     <timestamp key="STARTUP_TIME" datePattern="yyyy-MM-dd_HH-mm-ss" />
 
@@ -16,7 +16,7 @@
         </encoder>
     </appender>
 
-    <root level="DEBUG">
+    <root level="debug">
         <appender-ref ref="FILE"/>
     </root>
 

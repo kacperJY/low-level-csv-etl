@@ -1,5 +1,7 @@
 package pl.kacperjy.etl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import pl.kacperjy.etl.app.AppConfig;
 import pl.kacperjy.etl.app.Application;
 import pl.kacperjy.etl.exceptions.ConfigurationException;
@@ -18,6 +20,7 @@ class Main {
     }
 
     private static AppConfig loadAppConfig(){
+        Logger logger = LoggerFactory.getLogger(Main.class);
         try {
             ConfigManager configManager = new ConfigManager();
             Properties properties = configManager.loadConfig();
@@ -33,7 +36,7 @@ class Main {
             else
                 System.err.println("## Błąd krytyczny startu aplikacji: " + ((IOException) e).getMessage());
 
-            System.exit(1);
+            System.exit(404);
             return null; // Zadowala kompilator, proces i tak zginie linijkę wyżej
         }
     }
