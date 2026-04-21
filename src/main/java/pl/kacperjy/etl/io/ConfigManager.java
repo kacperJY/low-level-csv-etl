@@ -17,10 +17,10 @@ public class ConfigManager {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigManager.class);
 
-    public Properties loadConfig() throws IOException {
+    public Properties loadConfig() throws IOException{
         if (!Files.exists(APP_CONFIG_PATH)) {
             generateDefaultConfiguration();
-            throw new ConfigurationException("Cannot connect to database with default generated configuration");
+            throw new ConfigurationException("There is no configuration file. Default configuration has been generated, it has to be changed from default settings: " + APP_CONFIG_PATH);
         }
 
         Properties propertiesResult = readPropertiesFromFile();
@@ -37,7 +37,7 @@ public class ConfigManager {
             return properties;
         } catch (IOException e) {
             logger.error("Cannot read configuration file: {}", APP_CONFIG_PATH, e);
-            throw new ConfigurationException("Cannot read configuration file: " + APP_CONFIG_PATH, e);
+            throw new IOException("Cannot read configuration file: " + APP_CONFIG_PATH, e);
         }
     }
 
@@ -63,18 +63,17 @@ public class ConfigManager {
                 BufferedWriter bufferedWriter = Files.newBufferedWriter(APP_CONFIG_PATH)
         ) {
             defaultProperties.store(bufferedWriter, "### Default generated configuration ###");
-            logger.info("There is no configuration file. Default configuration has been generated, it has to be changed from default settings: {}", APP_CONFIG_PATH);
         } catch (IOException e) {
             logger.error("Cannot create new configuration file: {}", APP_CONFIG_PATH, e);
-            throw new ConfigurationException("No permission to create new configuration file: " + APP_CONFIG_PATH, e);
+            throw new IOException("No permission to create new configuration file: " + APP_CONFIG_PATH, e);
         }
     }
 
-    private enum ConfigProperties {
+    public enum ConfigProperties {
         DB_URL("db.url"),
         DB_USER("db.user"),
         DB_PASSWORD("db.password"),
-        SCHEMAS_CONFIG("schemas.directory.path");
+        SCHEMAS_DIRECTORY_PATH("directory.schemas.path");
 
         private final String propertyName;
 
