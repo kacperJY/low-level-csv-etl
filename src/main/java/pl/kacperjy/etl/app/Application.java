@@ -1,4 +1,9 @@
 package pl.kacperjy.etl.app;
 
-class Application {
+public class Application {
+
+
+    public void start(){
+
+    }
 }
