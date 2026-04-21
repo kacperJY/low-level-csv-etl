@@ -19,6 +19,8 @@ out/
 
 # Logi
 *.log
+*.csv
+data/
 
 # System 
 .DS_Store
