@@ -1,0 +1,44 @@
+{
+  "tableName": "pracownicy",
+  "csvFilePath": "pracownicy.csv",
+  "errorMode": "FAIL_FAST",
+  "conflictResolution": "UPDATE",
+  "columns": [
+    {
+      "name": "id",
+      "dataType": "BIGINT",
+      "isPrimaryKey": true,
+      "isUnique": true
+    },
+    {
+      "name": "pesel",
+      "dataType": "VARCHAR(11)",
+      "isPrimaryKey": false,
+      "isUnique": true
+    },
+    {
+      "name": "imie",
+      "dataType": "VARCHAR(50)",
+      "isPrimaryKey": false,
+      "isUnique": true
+    },
+    {
+      "name": "nazwisko",
+      "dataType": "VARCHAR(100)",
+      "isPrimaryKey": false,
+      "isUnique": true
+    },
+    {
+      "name": "data_zatrudnienia",
+      "dataType": "DATE",
+      "isPrimaryKey": false,
+      "isUnique": true
+    },
+    {
+      "name": "pensja",
+      "dataType": "NUMERIC(10, 2)",
+      "isPrimaryKey": false,
+      "isUnique": true
+    }
+  ]
+}

@@ -16,9 +16,9 @@ public class Printer {
 
     public void printErrorMessage(Object obj){
         if(obj instanceof Throwable throwable)
-            printLine("### ERROR ### " + throwable.getMessage());
+            printLine("### ERROR : " + throwable.getMessage());
         else
-            printLine("### ERROR ###" + obj.toString());
+            printLine("### ERROR : " + obj.toString());
 
     }
 }

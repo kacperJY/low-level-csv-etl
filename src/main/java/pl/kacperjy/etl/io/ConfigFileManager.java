@@ -9,13 +9,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
-public class ConfigManager {
+public class ConfigFileManager {
 
     private static final Path APP_CONFIG_PATH = Path.of("etl-config.properties");
 
     private static final String DEFAULT_CONFIGURATION_PROPERTY_VALUE = "%DEFAULT%";
 
-    private static final Logger logger = LoggerFactory.getLogger(ConfigManager.class);
+    private static final Logger logger = LoggerFactory.getLogger(ConfigFileManager.class);
 
     public Properties loadConfig() throws IOException{
         if (!Files.exists(APP_CONFIG_PATH)) {

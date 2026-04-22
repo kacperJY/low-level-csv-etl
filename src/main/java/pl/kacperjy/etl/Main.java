@@ -5,15 +5,14 @@ import org.slf4j.LoggerFactory;
 import pl.kacperjy.etl.app.AppConfig;
 import pl.kacperjy.etl.app.Application;
 import pl.kacperjy.etl.database.DatabaseManager;
-import pl.kacperjy.etl.database.SQLBuilder;
 import pl.kacperjy.etl.exceptions.ConfigurationException;
-import pl.kacperjy.etl.io.ConfigManager;
-import pl.kacperjy.etl.model.ColumnDef;
-import pl.kacperjy.etl.model.Schema;
+import pl.kacperjy.etl.io.ConfigFileManager;
+import pl.kacperjy.etl.io.SchemaFilesManager;
 import pl.kacperjy.etl.utils.Printer;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.util.List;
 import java.util.Properties;
@@ -34,33 +33,39 @@ class Main {
             DatabaseManager.initializeDatasource(appConfig);
             dataSource = DatabaseManager.getDatasource();
 
-            try (Connection connection = dataSource.getConnection()){} // MANUAL TEST
+            try (Connection connection = dataSource.getConnection()) {} // MANUAL TEST
 
-        } catch (Exception e){
+        } catch (Exception e) {
             logger.error("Critical error: Application cannot connect to database: {}.", appConfig.dbUrl(), e);
 
             printer.printErrorMessage("Application cannot connect to database " + appConfig.dbUrl() + ". Check your configuration file");
             System.exit(1);
         }
 
-        logger.info("Successfully connected to database: {}",appConfig.dbUrl());
+        logger.info("Successfully connected to database: {}", appConfig.dbUrl());
 
-        Application application = new Application(dataSource,printer);
+        if(!SchemaFilesManager.verifySchemaDirectoryExists(appConfig)){
+            logger.error("Schemas directory doesn't exists :: Path = {}", appConfig.directorySchemasPath());
+            printer.printErrorMessage("Cannot find schemas folder in path: " + appConfig.directorySchemasPath() + ". Check if path is correct in configuration file");
+            System.exit(1);
+        }
+
+        Application application = new Application(dataSource, appConfig,printer);
         application.start();
     }
 
-    private static AppConfig loadAppConfig(Printer printer){
+    private static AppConfig loadAppConfig(Printer printer) {
         try {
-            ConfigManager configManager = new ConfigManager();
-            Properties properties = configManager.loadConfig();
+            ConfigFileManager configFileManager = new ConfigFileManager();
+            Properties properties = configFileManager.loadConfig();
             return new AppConfig(
-                    properties.getProperty(ConfigManager.ConfigProperties.DB_URL.getPropertyName()),
-                    properties.getProperty(ConfigManager.ConfigProperties.DB_USER.getPropertyName()),
-                    properties.getProperty(ConfigManager.ConfigProperties.DB_PASSWORD.getPropertyName()),
-                    properties.getProperty(ConfigManager.ConfigProperties.SCHEMAS_DIRECTORY_PATH.getPropertyName())
+                    properties.getProperty(ConfigFileManager.ConfigProperties.DB_URL.getPropertyName()),
+                    properties.getProperty(ConfigFileManager.ConfigProperties.DB_USER.getPropertyName()),
+                    properties.getProperty(ConfigFileManager.ConfigProperties.DB_PASSWORD.getPropertyName()),
+                    properties.getProperty(ConfigFileManager.ConfigProperties.SCHEMAS_DIRECTORY_PATH.getPropertyName())
             );
         } catch (ConfigurationException | IOException e) {
-            if(e instanceof ConfigurationException ce)
+            if (e instanceof ConfigurationException ce)
                 logger.error(ce.getMessage());
             else
                 logger.error("## Critical error of start application: {}", ((IOException) e).getMessage());
