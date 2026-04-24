@@ -12,10 +12,8 @@ import pl.kacperjy.etl.utils.Printer;
 
 import javax.sql.DataSource;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.sql.Connection;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 class Main {
 
@@ -52,6 +50,7 @@ class Main {
 
         Application application = new Application(dataSource, appConfig,printer);
         application.start();
+
     }
 
     private static AppConfig loadAppConfig(Printer printer) {
@@ -65,11 +64,15 @@ class Main {
                     properties.getProperty(ConfigFileManager.ConfigProperties.SCHEMAS_DIRECTORY_PATH.getPropertyName())
             );
         } catch (ConfigurationException | IOException e) {
-            if (e instanceof ConfigurationException ce)
-                logger.error(ce.getMessage());
-            else
-                logger.error("## Critical error of start application: {}", ((IOException) e).getMessage());
-            printer.printErrorMessage("CONFIGURATION FILE PROBLEM ### There is no configuration file or configuration file contains default generated values");
+            if (e instanceof ConfigurationException ce) {
+                logger.error(ce.getMessage(), ce);
+                printer.printErrorMessage(ce.getMessage());
+                printer.printLine("Check your configuration and re-start application.");
+            }
+            else {
+                logger.error(e.getMessage(), e);
+                printer.printErrorMessage("## Critical error of start application: ");
+            }
             System.exit(1);
             return null; // Zadowala kompilator, proces i tak zginie linijkę wyżej
         }

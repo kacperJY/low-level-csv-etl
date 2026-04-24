@@ -6,11 +6,9 @@ import pl.kacperjy.etl.model.Schema;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SQLBuilder {
-
+class SQLBuilder {
 
     public static String sqlCreate(Schema schema){
-
 
         List<String> columns = new ArrayList<>();
         List<String> primaryKeyColumns = new ArrayList<>();
@@ -27,7 +25,7 @@ public class SQLBuilder {
                 primaryKeyColumns.add(columnDef.name());
         }
 
-        String start = "CREATE TABLE IF NOT EXISTS %s (\n".formatted(schema.tableName());
+        String start = "CREATE TABLE %s (\n".formatted(schema.tableName());
 
         StringBuilder builder = new StringBuilder(start);
         builder.append(String.join(",\n",columns));

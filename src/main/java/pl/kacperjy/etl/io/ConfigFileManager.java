@@ -36,7 +36,6 @@ public class ConfigFileManager {
             properties.load(bufferedReader);
             return properties;
         } catch (IOException e) {
-            logger.error("Cannot read configuration file: {}", APP_CONFIG_PATH, e);
             throw new IOException("Cannot read configuration file: " + APP_CONFIG_PATH, e);
         }
     }
@@ -64,7 +63,6 @@ public class ConfigFileManager {
         ) {
             defaultProperties.store(bufferedWriter, "### Default generated configuration ###");
         } catch (IOException e) {
-            logger.error("Cannot create new configuration file: {}", APP_CONFIG_PATH, e);
             throw new IOException("No permission to create new configuration file: " + APP_CONFIG_PATH, e);
         }
     }

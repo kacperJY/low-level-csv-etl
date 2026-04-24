@@ -3,6 +3,8 @@ package pl.kacperjy.etl.app;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.kacperjy.etl.database.DatabaseManager;
+import pl.kacperjy.etl.database.SchemaDAO;
+import pl.kacperjy.etl.exceptions.SQLCreateSchemaException;
 import pl.kacperjy.etl.io.JSONSchemaReader;
 import pl.kacperjy.etl.io.SchemaFilesManager;
 import pl.kacperjy.etl.model.Schema;
@@ -22,6 +24,8 @@ public class Application {
     private final DataSource dataSource;
     private final AppConfig appConfig;
 
+    // DAO
+    private final SchemaDAO schemaDAO;
 
     private final List<Schema> schemaList = new ArrayList<>();
 
@@ -32,6 +36,9 @@ public class Application {
     public Application(DataSource dataSource, AppConfig appConfig, Printer printer) {
         this.dataSource = dataSource;
         this.appConfig = appConfig;
+
+        // DAO
+        schemaDAO = new SchemaDAO(dataSource);
 
         // UTILS
         this.printer = printer;
@@ -67,7 +74,8 @@ public class Application {
         } while (option != Option.EXIT);
     }
 
-    private void showSchemasList(){
+    private void showSchemasList() {
+        printer.printHeader("SCHEMA LIST");
         schemaList.forEach(schema -> printer.printLine(schema.tableName()));
     }
 
@@ -79,18 +87,27 @@ public class Application {
                 try {
                     Schema schema = JSONSchemaReader.read(path);
                     schemaList.add(schema);
-                } catch (IOException e){
+                } catch (IOException e) {
                     printer.printLine("Cannot read schema from file: Path = " + path + ". This file will be ignored");
+                    logger.error(e.getMessage(), e);
                 }
             }
 
-        } catch (IOException e){
+        } catch (IOException e) {
             printer.printErrorMessage("Schemas folder doesn't exists or no permissions to read files in schemas folder : Path = " + appConfig.directorySchemasPath());
         }
     }
 
     private void persistSchemas() {
-
+        for (Schema schema : schemaList) {
+            try {
+                schemaDAO.create(schema);
+                printer.printLine("Schema : %s has been successfully saved to database".formatted(schema.tableName()));
+            } catch (SQLCreateSchemaException e) {
+                logger.error(e.getMessage(), e);
+                printer.printErrorMessage("Cannot persist schema: %s. Probably schema is already in database. This schema will be ignored.".formatted(schema.tableName()));
+            }
+        }
     }
 
     private void exit() {

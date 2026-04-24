@@ -20,6 +20,11 @@ public class DatabaseManager {
         hikariConfig.setUsername(appConfig.dbUser());
         hikariConfig.setPassword(appConfig.dbPassword());
 
+        hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
+        hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
+        hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+        hikariConfig.addDataSourceProperty("reWriteBatchedInserts", "true");
+
         hikariConfig.setMaximumPoolSize(10);
         hikariConfig.setAutoCommit(false);
         hikariConfig.setInitializationFailTimeout(200);

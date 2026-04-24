@@ -26,8 +26,7 @@ public class SchemaFilesManager {
         ) {
             return pathStream.toList();
         } catch (IOException e) {
-            logger.error("Cannot read schema files from schemas directory :: Path = {}", schmeasDirectoryPath, e);
-            throw new IOException("Cannot read schema files from schemas directory :: Path = " + schmeasDirectoryPath);
+            throw new IOException("Cannot read schema files from schemas directory :: Path = " + schmeasDirectoryPath, e);
         }
     }
 

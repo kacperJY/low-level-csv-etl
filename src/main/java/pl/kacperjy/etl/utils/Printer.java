@@ -14,6 +14,11 @@ public class Printer {
         }
     }
 
+    public void printHeader(String headerName){
+        String content = "### %s ###".formatted(headerName);
+        printLine(content);
+    }
+
     public void printErrorMessage(Object obj){
         if(obj instanceof Throwable throwable)
             printLine("### ERROR : " + throwable.getMessage());
