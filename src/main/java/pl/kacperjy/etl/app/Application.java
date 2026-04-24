@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import pl.kacperjy.etl.database.DatabaseManager;
 import pl.kacperjy.etl.database.SchemaDAO;
 import pl.kacperjy.etl.exceptions.SQLCreateSchemaException;
+import pl.kacperjy.etl.io.DataFileScanner;
 import pl.kacperjy.etl.io.JSONSchemaReader;
 import pl.kacperjy.etl.io.SchemaFilesManager;
 import pl.kacperjy.etl.model.Schema;
@@ -69,9 +70,17 @@ public class Application {
                     persistSchemas();
                 }
                 case LOAD_DATA -> {
+                    loadData();
                 }
             }
         } while (option != Option.EXIT);
+    }
+
+    private void loadData() {
+        DataFileScanner dataFileScanner = new DataFileScanner(schemaList);
+        dataFileScanner.scanAndFillQueue(dataBatch ->{
+
+        });
     }
 
     private void showSchemasList() {
