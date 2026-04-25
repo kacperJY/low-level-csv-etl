@@ -101,7 +101,7 @@ public class DataFileScanner {
                         endRowIndexArray[rowsCounter] = globalPosition; // INSERT END POSITION of ROW
                         rowsCounter++; // UPDATE rows number in BATCH
                         separatorCounterBeforeEndLine = 0; // RESET counter of columns in row
-                        globalStartRowPosition = globalPosition + 1; // POSITION where starts next row - +1 byte after last newLine
+                        globalStartRowPosition = globalPosition + 1; // POSITION where starts next row - +1 byte after last newLine [previous row end]
 
                         // FULL BATCH
                         if (rowsCounter == BATCH_SIZE) {
@@ -109,7 +109,17 @@ public class DataFileScanner {
                             byte[] batchBytesArray = new byte[batchBytesSize];
                             mapMemoryReader.readRandomBytes(batchBytesArray, startRowIndexArray, endRowIndexArray, rowsCounter-1);
 
-                            DataBatch dataBatch = new DataBatch(batchBytesArray, startRowIndexArray, endRowIndexArray, separatorIndexArray, rowsCounter);
+                            // PREPARE safe array to avoid race condition and modifying array by many parts of application
+                            long [] safeStartRowIndexArray = Arrays.copyOf(startRowIndexArray,startRowIndexArray.length);
+                            long [] safeEndRowIndexArray = Arrays.copyOf(endRowIndexArray,endRowIndexArray.length);
+                            long [] safeSeparatorIndexArray = Arrays.copyOf(separatorIndexArray,separatorIndexArray.length);
+
+                            DataBatch dataBatch = new DataBatch(
+                                    batchBytesArray,
+                                    safeStartRowIndexArray,
+                                    safeEndRowIndexArray,
+                                    safeSeparatorIndexArray,
+                                    rowsCounter,maxColumnNumber);
                             dataBatchConsumer.accept(dataBatch); // PUSH full dataBatch to parse and persists in DB - PIPELINE
 
                             // CLEAR BATCH STATE
@@ -129,7 +139,8 @@ public class DataFileScanner {
             if(rowsCounter != 0) {
                 // Append newLine if file doesn't end with new line
                 if (globalPosition != endRowIndexArray[rowsCounter-1]) {
-                    endRowIndexArray[rowsCounter] = globalPosition;
+                    startRowIndexArray[rowsCounter] = globalStartRowPosition; // ADD start position of last row
+                    endRowIndexArray[rowsCounter] = globalPosition; // ADD end position of last row
                     rowsCounter++;
                 }
 
@@ -138,10 +149,21 @@ public class DataFileScanner {
                 byte[] batchBytesArray = new byte[currentBatchBytesSize];
                 mapMemoryReader.readRandomBytes(batchBytesArray,startRowIndexArray,endRowIndexArray,rowsCounter-1);
 
-                DataBatch dataBatch = new DataBatch(batchBytesArray, startRowIndexArray, endRowIndexArray, separatorIndexArray, rowsCounter);
+                // PREPARE safe array to avoid race condition and modifying array by many parts of application
+                long [] safeStartRowIndexArray = Arrays.copyOf(startRowIndexArray,startRowIndexArray.length);
+                long [] safeEndRowIndexArray = Arrays.copyOf(endRowIndexArray,endRowIndexArray.length);
+                long [] safeSeparatorIndexArray = Arrays.copyOf(separatorIndexArray,separatorIndexArray.length);
+
+                DataBatch dataBatch = new DataBatch(
+                        batchBytesArray,
+                        safeStartRowIndexArray,
+                        safeEndRowIndexArray,
+                        safeSeparatorIndexArray,
+                        rowsCounter,maxColumnNumber);
                 dataBatchConsumer.accept(dataBatch); // PUSH full dataBatch to parse and persists in DB - PIPELINE
             }
 
+            System.out.println("STATYSTKI TESTOWE");
             System.out.println(Arrays.toString(startRowIndexArray));
             System.out.println(Arrays.toString(endRowIndexArray));
             System.out.println(Arrays.toString(separatorIndexArray));

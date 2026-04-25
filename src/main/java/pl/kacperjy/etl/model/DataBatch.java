@@ -5,5 +5,6 @@ public record DataBatch(
         long[] startRowIndexArray,
         long[] endRowIndexArray,
         long[] separatorIndexArray,
-        int rowsInBatch
+        int rowsInBatch,
+        int columnsInRow
 ) {}

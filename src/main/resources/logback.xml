@@ -16,6 +16,9 @@
         </encoder>
     </appender>
 
+    <logger name="com.zaxxer.hikari" level="INFO">
+    </logger>
+
     <root level="debug">
         <appender-ref ref="FILE"/>
     </root>

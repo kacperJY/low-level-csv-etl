@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import pl.kacperjy.etl.database.DatabaseManager;
 import pl.kacperjy.etl.database.SchemaDAO;
 import pl.kacperjy.etl.exceptions.SQLCreateSchemaException;
+import pl.kacperjy.etl.io.DataBatchParser;
 import pl.kacperjy.etl.io.DataFileScanner;
 import pl.kacperjy.etl.io.JSONSchemaReader;
 import pl.kacperjy.etl.io.SchemaFilesManager;
@@ -79,7 +80,7 @@ public class Application {
     private void loadData() {
         DataFileScanner dataFileScanner = new DataFileScanner(schemaList);
         dataFileScanner.scanAndFillQueue(dataBatch ->{
-
+            DataBatchParser.parseDataBatch(dataBatch);
         });
     }
 
