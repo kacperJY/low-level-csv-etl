@@ -2,11 +2,11 @@ package pl.kacperjy.etl.app;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import pl.kacperjy.etl.database.DataDAO;
 import pl.kacperjy.etl.database.DatabaseManager;
 import pl.kacperjy.etl.database.SchemaDAO;
 import pl.kacperjy.etl.exceptions.SQLCreateSchemaException;
-import pl.kacperjy.etl.io.DataBatchParser;
-import pl.kacperjy.etl.io.DataFileScanner;
+import pl.kacperjy.etl.io.DataLoader;
 import pl.kacperjy.etl.io.JSONSchemaReader;
 import pl.kacperjy.etl.io.SchemaFilesManager;
 import pl.kacperjy.etl.model.Schema;
@@ -28,6 +28,7 @@ public class Application {
 
     // DAO
     private final SchemaDAO schemaDAO;
+    private final DataDAO dataDAO;
 
     private final List<Schema> schemaList = new ArrayList<>();
 
@@ -40,7 +41,8 @@ public class Application {
         this.appConfig = appConfig;
 
         // DAO
-        schemaDAO = new SchemaDAO(dataSource);
+        this.schemaDAO = new SchemaDAO(dataSource);
+        this.dataDAO = new DataDAO(dataSource);
 
         // UTILS
         this.printer = printer;
@@ -78,10 +80,12 @@ public class Application {
     }
 
     private void loadData() {
-        DataFileScanner dataFileScanner = new DataFileScanner(schemaList);
-        dataFileScanner.scanAndFillQueue(dataBatch ->{
-            DataBatchParser.parseDataBatch(dataBatch);
-        });
+        long start = System.currentTimeMillis();
+        DataLoader dataLoader = new DataLoader(schemaList,dataDAO,printer);
+        dataLoader.loadData();
+        long end = System.currentTimeMillis();
+
+        System.out.println("ŁADOWANEI ZAJEŁA: " + (end - start));
     }
 
     private void showSchemasList() {

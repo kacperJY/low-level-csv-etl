@@ -10,8 +10,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
-public record SchemaDAO(DataSource dataSource) {
+public class SchemaDAO {
     private static final Logger logger = LoggerFactory.getLogger(SchemaDAO.class);
+    private final DataSource dataSource;
+
+    public SchemaDAO(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
 
     public void create(Schema schema) {
         try (
@@ -21,7 +26,7 @@ public record SchemaDAO(DataSource dataSource) {
             try {
                 prep.executeUpdate();
                 connection.commit();
-            } catch (SQLException e){
+            } catch (SQLException e) {
                 connection.rollback();
                 throw e;
             }

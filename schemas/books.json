@@ -1,0 +1,31 @@
+{
+  "tableName": "books",
+  "csvFilePath": "books.csv",
+  "errorMode": "FAIL_FAST",
+  "hasHeader": true,
+  "conflictResolution": "UPDATE",
+  "conflictTargets": ["ISBN"],
+  "columns": [
+    {
+      "name": "title",
+      "dataType": "VARCHAR(50)",
+      "isPrimaryKey": false,
+      "isUnique": false,
+      "additionalAttributes": []
+    },
+    {
+      "name": "author",
+      "dataType": "VARCHAR(50)",
+      "isPrimaryKey": false,
+      "isUnique": false,
+      "additionalAttributes": []
+    },
+    {
+      "name": "ISBN",
+      "dataType": "VARCHAR(50)",
+      "isPrimaryKey": false,
+      "isUnique": true,
+      "additionalAttributes": []
+    }
+  ]
+}

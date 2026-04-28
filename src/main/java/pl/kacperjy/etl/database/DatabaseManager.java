@@ -25,7 +25,7 @@ public class DatabaseManager {
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
         hikariConfig.addDataSourceProperty("reWriteBatchedInserts", "true");
 
-        hikariConfig.setMaximumPoolSize(10);
+        hikariConfig.setMaximumPoolSize(15);
         hikariConfig.setAutoCommit(false);
         hikariConfig.setInitializationFailTimeout(200);
         hikariDataSource = new HikariDataSource(hikariConfig);

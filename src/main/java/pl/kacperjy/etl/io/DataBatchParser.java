@@ -4,10 +4,9 @@ import pl.kacperjy.etl.model.DataBatch;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
-public class DataBatchParser {
+class DataBatchParser {
 
     private DataBatchParser(){}
 
@@ -46,14 +45,11 @@ public class DataBatchParser {
                     currentWordEndGlobal = separators[currentSeparatorIndex++]; // Next separator
                 }
 
-                // MATEMATYKA RELATYWNA W LOCIE (bez modyfikacji wejściowych tablic!)
                 int localOffset = (int) (currentWordStartGlobal - batchGlobalStart);
                 int wordLength = (int) (currentWordEndGlobal - currentWordStartGlobal);
 
-                // ZERO MIKRO-TABLIC! Używamy zoptymalizowanego konstruktora String
                 rowFields[c] = new String(rawData, localOffset, wordLength, StandardCharsets.UTF_8);
 
-                // Przygotowanie wskaźnika dla następnego słowa (+1 aby ominąć średnik/\n)
                 currentWordStartGlobal = currentWordEndGlobal + 1;
             }
             resultData.add(rowFields);

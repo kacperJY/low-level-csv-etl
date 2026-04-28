@@ -7,8 +7,10 @@ import java.util.List;
 public record Schema(
         @JsonProperty("tableName") String tableName,
         @JsonProperty("csvFilePath") String filePath,
-        @JsonProperty("errorMode") String errorMode,
-        @JsonProperty("conflictResolution") String conflictResolution,
+        @JsonProperty("errorMode") ErrorMode errorMode,
+        @JsonProperty("conflictResolution") ConflictResolutionMode conflictResolution,
+        @JsonProperty("hasHeader") boolean hasHeader,
+        @JsonProperty("conflictTargets") List<String> conflictTargets,
         @JsonProperty("columns") List<ColumnDef> columnDefList
 ) {
 }

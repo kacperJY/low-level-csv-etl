@@ -14,162 +14,198 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class DataFileScanner {
+class DataFileScanner {
 
     private static final Logger logger = LoggerFactory.getLogger(DataFileScanner.class);
-
-    private final Collection<Schema> schemaCollection;
 
     private static final int BATCH_SIZE = 1000;
 
     private static final int PAGE_SIZE = 1024 * 1024 * 1024; // 1 GB
 
-    public DataFileScanner(Collection<Schema> schemaCollection) {
-        this.schemaCollection = schemaCollection;
-    }
 
-    public void scanAndFillQueue(Consumer<DataBatch> dataBatchConsumer) {
+    public static void scanAndPush(Schema schema, Consumer<DataBatch> dataBatchConsumer) {
 
         // MAIN LOOP
-        for (Schema schema : schemaCollection) {
-            Path filePath = Path.of(schema.filePath());
-            List<MappedByteBuffer> mappedByteBufferList = new ArrayList<>();
+        Path filePath = Path.of(schema.filePath());
+        List<MappedByteBuffer> mappedByteBufferList = new ArrayList<>();
 
-            // MAPPING MEMORY
-            try (
-                    FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ)
-            ) {
-                long fileSize = fileChannel.size();
+        // MAPPING MEMORY
+        try (
+                FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ)
+        ) {
+            long fileSize = fileChannel.size();
 
-                for (long position = 0; position < fileSize; position += PAGE_SIZE) {
-                    long bytesToMap = Math.min(PAGE_SIZE, (fileSize - position));
+            for (long position = 0; position < fileSize; position += PAGE_SIZE) {
+                long bytesToMap = Math.min(PAGE_SIZE, (fileSize - position));
 
-                    MappedByteBuffer mappedByteBuffer = fileChannel.map(
-                            FileChannel.MapMode.READ_ONLY,
-                            position,
-                            bytesToMap);
+                MappedByteBuffer mappedByteBuffer = fileChannel.map(
+                        FileChannel.MapMode.READ_ONLY,
+                        position,
+                        bytesToMap);
 
-                    mappedByteBufferList.add(mappedByteBuffer);
-                }
-            } catch (IOException e) {
-                throw new FileScanException("Cannot read file. Not enough permissions or files doesn't exists. Schema {%s} will not be loaded to database".formatted(schema.tableName()), e);
+                mappedByteBufferList.add(mappedByteBuffer);
             }
-
-            // MAPPED MEMORY - READY TO USE
-            MapMemoryReader mapMemoryReader = new MapMemoryReader(mappedByteBufferList);
-
-            // VALIDATE INFO
-            final int maxColumnNumber = schema.columnDefList().size();
-
-            boolean endOfFile = false;
-
-            long[] startRowIndexArray = new long[BATCH_SIZE];
-            long[] endRowIndexArray = new long[BATCH_SIZE];
-            long[] separatorIndexArray = new long[BATCH_SIZE * (maxColumnNumber - 1)];
-
-            int rowsCounter = 0;
-            int separatorCounter = 0;
-
-            int separatorCounterBeforeEndLine = 0;
-
-            long globalStartRowPosition = 0;
-            long globalPosition = 0;
-
-            byte[] tempBytes = new byte[1024]; // Reading mode - 1 KB
-
-            while (!endOfFile) {
-                int nBytes = mapMemoryReader.getNBytes(tempBytes);
-
-                // No more data
-                if (nBytes == 0) {
-                    endOfFile = true;
-                    continue;
-                }
-
-                for (int i = 0; i < nBytes; i++) {
-                    if (tempBytes[i] == '\n') {
-                        if (separatorCounterBeforeEndLine != (maxColumnNumber - 1)) {
-                            System.out.println("TRUE");
-                            throw new WrongFormatFileException("Schema file defined %d columns per row. Found %d columns".
-                                    formatted(maxColumnNumber, separatorCounterBeforeEndLine + 1));
-                        }
-                        startRowIndexArray[rowsCounter] = globalStartRowPosition; // INSERT START POSITION of ROW
-                        endRowIndexArray[rowsCounter] = globalPosition; // INSERT END POSITION of ROW
-                        rowsCounter++; // UPDATE rows number in BATCH
-                        separatorCounterBeforeEndLine = 0; // RESET counter of columns in row
-                        globalStartRowPosition = globalPosition + 1; // POSITION where starts next row - +1 byte after last newLine [previous row end]
-
-                        // FULL BATCH
-                        if (rowsCounter == BATCH_SIZE) {
-                            int batchBytesSize = (int) (endRowIndexArray[endRowIndexArray.length - 1] - startRowIndexArray[0]);
-                            byte[] batchBytesArray = new byte[batchBytesSize];
-                            mapMemoryReader.readRandomBytes(batchBytesArray, startRowIndexArray, endRowIndexArray, rowsCounter-1);
-
-                            // PREPARE safe array to avoid race condition and modifying array by many parts of application
-                            long [] safeStartRowIndexArray = Arrays.copyOf(startRowIndexArray,startRowIndexArray.length);
-                            long [] safeEndRowIndexArray = Arrays.copyOf(endRowIndexArray,endRowIndexArray.length);
-                            long [] safeSeparatorIndexArray = Arrays.copyOf(separatorIndexArray,separatorIndexArray.length);
-
-                            DataBatch dataBatch = new DataBatch(
-                                    batchBytesArray,
-                                    safeStartRowIndexArray,
-                                    safeEndRowIndexArray,
-                                    safeSeparatorIndexArray,
-                                    rowsCounter,maxColumnNumber);
-                            dataBatchConsumer.accept(dataBatch); // PUSH full dataBatch to parse and persists in DB - PIPELINE
-
-                            // CLEAR BATCH STATE
-                            rowsCounter = 0;
-                            separatorCounter = 0;
-                        }
-
-                    } else if (tempBytes[i] == ';') {
-                        separatorIndexArray[separatorCounter] = globalPosition;
-                        separatorCounter++;
-                        separatorCounterBeforeEndLine++;
-                    }
-                    globalPosition++;
-                }
-            }
-
-            if(rowsCounter != 0) {
-                // Append newLine if file doesn't end with new line
-                if (globalPosition != endRowIndexArray[rowsCounter-1]) {
-                    startRowIndexArray[rowsCounter] = globalStartRowPosition; // ADD start position of last row
-                    endRowIndexArray[rowsCounter] = globalPosition; // ADD end position of last row
-                    rowsCounter++;
-                }
-
-                // PUSH last dataBatch - if there are rest of rows - rowsCounter < BATCH_SIZE
-                int currentBatchBytesSize = (int) (endRowIndexArray[rowsCounter-1] - startRowIndexArray[0]);
-                byte[] batchBytesArray = new byte[currentBatchBytesSize];
-                mapMemoryReader.readRandomBytes(batchBytesArray,startRowIndexArray,endRowIndexArray,rowsCounter-1);
-
-                // PREPARE safe array to avoid race condition and modifying array by many parts of application
-                long [] safeStartRowIndexArray = Arrays.copyOf(startRowIndexArray,startRowIndexArray.length);
-                long [] safeEndRowIndexArray = Arrays.copyOf(endRowIndexArray,endRowIndexArray.length);
-                long [] safeSeparatorIndexArray = Arrays.copyOf(separatorIndexArray,separatorIndexArray.length);
-
-                DataBatch dataBatch = new DataBatch(
-                        batchBytesArray,
-                        safeStartRowIndexArray,
-                        safeEndRowIndexArray,
-                        safeSeparatorIndexArray,
-                        rowsCounter,maxColumnNumber);
-                dataBatchConsumer.accept(dataBatch); // PUSH full dataBatch to parse and persists in DB - PIPELINE
-            }
-
-            System.out.println("STATYSTKI TESTOWE");
-            System.out.println(Arrays.toString(startRowIndexArray));
-            System.out.println(Arrays.toString(endRowIndexArray));
-            System.out.println(Arrays.toString(separatorIndexArray));
+        } catch (IOException e) {
+            throw new FileScanException("Cannot read file. Not enough permissions or files doesn't exists. Schema {%s} will not be loaded to database".formatted(schema.tableName()), e);
         }
 
+        // MAPPED MEMORY - READY TO USE
+        MapMemoryReader mapMemoryReader = new MapMemoryReader(mappedByteBufferList);
+
+        // VALIDATE INFO
+        final int maxColumnNumber = schema.columnDefList().size();
+
+        boolean endOfFile = false;
+
+        long[] startRowIndexArray = new long[BATCH_SIZE];
+        long[] endRowIndexArray = new long[BATCH_SIZE];
+        long[] separatorIndexArray = new long[BATCH_SIZE * (maxColumnNumber - 1)];
+
+        int rowsCounter = 0;
+        int separatorCounter = 0;
+
+        int separatorCounterBeforeEndLine = 0;
+
+        long globalStartRowPosition = 0;
+        long globalPosition = 0;
+
+        byte[] tempBytes = new byte[4096]; // Reading mode - 1 KB
+
+        boolean headerActive = schema.hasHeader();
+
+        while (!endOfFile) {
+            int nBytes = mapMemoryReader.getNBytes(tempBytes);
+
+            // No more data
+            if (nBytes == 0) {
+                endOfFile = true;
+                continue;
+            }
+
+            for (int i = 0; i < nBytes; i++) {
+                if (tempBytes[i] == '\n') {
+
+                    if (headerActive) {
+                        globalStartRowPosition = globalPosition + 1;
+                        separatorCounterBeforeEndLine = 0;
+                        headerActive = false;
+                        separatorCounter = 0;
+                        globalPosition++;
+                        continue;
+                    }
+
+                    if (separatorCounterBeforeEndLine != (maxColumnNumber - 1)) {
+                        logger.error("### Invalid file format : Schema file defined {} columns per row. Found {} columns", maxColumnNumber, separatorCounterBeforeEndLine + 1);
+                        throw new WrongFormatFileException("Schema file defined %d columns per row. Found %d columns".
+                                formatted(maxColumnNumber, separatorCounterBeforeEndLine + 1));
+                    }
+
+                    startRowIndexArray[rowsCounter] = globalStartRowPosition; // INSERT START POSITION of ROW
+                    endRowIndexArray[rowsCounter] = globalPosition; // INSERT END POSITION of ROW
+                    rowsCounter++; // UPDATE rows number in BATCH
+                    separatorCounterBeforeEndLine = 0; // RESET counter of columns in row
+                    globalStartRowPosition = globalPosition + 1; // POSITION where starts next row - +1 byte after last newLine [previous row end]
+
+                    // FULL BATCH
+                    if (rowsCounter == BATCH_SIZE) {
+
+
+                        // FLAGS
+                        // lastIndex -> last row
+                        // rowsCounter -> next free after last row
+                        // globalPositon -> the last byte of file
+                        int lastIndex = rowsCounter - 1;
+
+                        int batchBytesSize = (int) (endRowIndexArray[lastIndex] - startRowIndexArray[0]);
+                        byte[] batchBytesArray = new byte[batchBytesSize];
+                        mapMemoryReader.readRandomBytes(batchBytesArray, startRowIndexArray, endRowIndexArray, lastIndex);
+
+                        // PREPARE safe array to avoid race condition and modifying array by many parts of application
+                        long[] safeStartRowIndexArray = Arrays.copyOf(startRowIndexArray, startRowIndexArray.length);
+                        long[] safeEndRowIndexArray = Arrays.copyOf(endRowIndexArray, endRowIndexArray.length);
+                        long[] safeSeparatorIndexArray = Arrays.copyOf(separatorIndexArray, separatorIndexArray.length);
+
+                        DataBatch dataBatch = new DataBatch(
+                                batchBytesArray,
+                                safeStartRowIndexArray,
+                                safeEndRowIndexArray,
+                                safeSeparatorIndexArray,
+                                lastIndex + 1, maxColumnNumber);
+                        dataBatchConsumer.accept(dataBatch); // PUSH full dataBatch to parse and persists in DB - PIPELINE
+
+                        // CLEAR BATCH STATE
+                        rowsCounter = 0;
+                        separatorCounter = 0;
+                    }
+
+                } else if (tempBytes[i] == ';') {
+                    separatorIndexArray[separatorCounter] = globalPosition;
+                    separatorCounter++;
+                    separatorCounterBeforeEndLine++;
+                }
+                globalPosition++;
+            }
+        }
+
+        // REST of ROW - NOT FULL BATCH - rowsCounter < BATCH_SIZE
+
+        // FLAGS
+        // lastIndex -> last row
+        // rowsCounter -> next free after last row
+        // globalPosition -> pointing one byte out of file
+        // globalPositon - 1 -> the last byte of file
+        int lastIndex;
+
+
+        // CASE 0: If there is 0 rows left -> startPosRow = one byte out of file
+        if (rowsCounter == 0 && globalStartRowPosition >= globalPosition) {
+            return;
+        }
+
+        // CASES of not full BATCH rowsCounter < BATCH_SIZE
+        // CASE 1: There was only one row(last row) but has a new line at the end of file
+        // CASE 2: There was more than one row but has a new line at the end of file
+        if (rowsCounter != 0) {
+            lastIndex = rowsCounter - 1;
+
+            // CASE 3: There was more than one row but has no new line at the end of file - FIRST AND SECOND IF
+            if (globalPosition - 1 != endRowIndexArray[lastIndex]) {
+                startRowIndexArray[rowsCounter] = globalStartRowPosition; // ADD start position of last row
+                endRowIndexArray[rowsCounter] = globalPosition; // ADD end position of last row
+                lastIndex++; // move to next last row
+            }
+        } else { // CASE4 - There was only one row(last row) but has no new line at the end of file
+            lastIndex = 0;
+
+            startRowIndexArray[lastIndex] = globalStartRowPosition; // ADD start position of last row
+            endRowIndexArray[lastIndex] = globalPosition; // ADD end position of last row
+        }
+
+
+        // PUSH last dataBatch - if there are rest of rows - rowsCounter < BATCH_SIZE
+        int currentBatchBytesSize = (int) (endRowIndexArray[lastIndex] - startRowIndexArray[0]);
+        byte[] batchBytesArray = new byte[currentBatchBytesSize];
+        mapMemoryReader.readRandomBytes(batchBytesArray, startRowIndexArray, endRowIndexArray, lastIndex);
+
+        // PREPARE safe array to avoid race condition and modifying array by many parts of application
+        long[] safeStartRowIndexArray = Arrays.copyOf(startRowIndexArray, startRowIndexArray.length);
+        long[] safeEndRowIndexArray = Arrays.copyOf(endRowIndexArray, endRowIndexArray.length);
+        long[] safeSeparatorIndexArray = Arrays.copyOf(separatorIndexArray, separatorIndexArray.length);
+
+        DataBatch dataBatch = new DataBatch(
+                batchBytesArray,
+                safeStartRowIndexArray,
+                safeEndRowIndexArray,
+                safeSeparatorIndexArray,
+                lastIndex + 1, maxColumnNumber);
+        dataBatchConsumer.accept(dataBatch); // PUSH full dataBatch to parse and persists in DB - PIPELINE
+
+
     }
+
 
     private static class MapMemoryReader {
 

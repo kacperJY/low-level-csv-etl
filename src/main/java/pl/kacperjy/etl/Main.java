@@ -6,6 +6,7 @@ import pl.kacperjy.etl.app.AppConfig;
 import pl.kacperjy.etl.app.Application;
 import pl.kacperjy.etl.database.DatabaseManager;
 import pl.kacperjy.etl.exceptions.ConfigurationException;
+import pl.kacperjy.etl.exceptions.DatabaseException;
 import pl.kacperjy.etl.io.ConfigFileManager;
 import pl.kacperjy.etl.io.SchemaFilesManager;
 import pl.kacperjy.etl.utils.Printer;
@@ -48,8 +49,15 @@ class Main {
             System.exit(1);
         }
 
-        Application application = new Application(dataSource, appConfig,printer);
-        application.start();
+        try {
+            Application application = new Application(dataSource, appConfig,printer);
+            application.start();
+            logger.info("ETL Process has been finished");
+            System.exit(0); // 0 oznacza sukces dla systemu operacyjnego
+        } catch (RuntimeException e){
+            printer.printErrorMessage(e.getMessage());
+            System.exit(1);
+        }
 
     }
 

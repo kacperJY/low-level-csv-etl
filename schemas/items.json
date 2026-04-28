@@ -1,10 +1,10 @@
 {
-  "tableName": "pracownicy2",
-  "csvFilePath": "pracownicy.csv",
+  "tableName": "items",
+  "csvFilePath": "items.csv",
   "errorMode": "FAIL_FAST",
   "hasHeader": true,
-  "conflictResolution": "UPDATE",
-  "conflictTargets": ["pesel"],
+  "conflictResolution": "IGNORE",
+  "conflictTargets": ["id"],
   "columns": [
     {
       "name": "id",
@@ -14,36 +14,36 @@
       "additionalAttributes": []
     },
     {
-      "name": "pesel",
-      "dataType": "VARCHAR(11)",
-      "isPrimaryKey": false,
-      "isUnique": true,
-      "additionalAttributes": []
-    },
-    {
-      "name": "imie",
+      "name": "name",
       "dataType": "VARCHAR(50)",
       "isPrimaryKey": false,
       "isUnique": false,
       "additionalAttributes": []
     },
     {
-      "name": "nazwisko",
-      "dataType": "VARCHAR(100)",
-      "isPrimaryKey": false,
-      "isUnique": false,
-      "additionalAttributes": []
-    },
-    {
-      "name": "data_zatrudnienia",
-      "dataType": "DATE",
-      "isPrimaryKey": false,
-      "isUnique": false,
-      "additionalAttributes": []
-    },
-    {
-      "name": "pensja",
+      "name": "price",
       "dataType": "NUMERIC(10,2)",
+      "isPrimaryKey": false,
+      "isUnique": false,
+      "additionalAttributes": []
+    },
+    {
+      "name": "category",
+      "dataType": "VARCHAR(50)",
+      "isPrimaryKey": false,
+      "isUnique": false,
+      "additionalAttributes": []
+    },
+    {
+      "name": "description",
+      "dataType": "VARCHAR(150)",
+      "isPrimaryKey": false,
+      "isUnique": false,
+      "additionalAttributes": []
+    },
+    {
+      "name": "quantity",
+      "dataType": "INT",
       "isPrimaryKey": false,
       "isUnique": false,
       "additionalAttributes": []
