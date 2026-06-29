@@ -71,7 +71,7 @@ public class DataLoader {
                     case DatabaseException dbEx ->{
                         printer.printLine("--------------------------------------");
                         printer.printErrorMessage(dbEx.getMessage());
-                        printer.printLine("\t", "Schema {%s} will not be loaded correctly. Check your CSV file or Schema configuration".formatted(schema.tableName()));
+                        printer.printLine("\t", "Schema {%s} will not be loaded. Check your CSV file or Schema configuration".formatted(schema.tableName()));
                         printer.printLine("--------------------------------------");
                     }
                     default -> throw new RuntimeException(caused.getMessage(),caused);

@@ -1,77 +1,107 @@
-🚀 High-Performance Java ETL Pipeline
+# 🚀 High-Performance Java ETL Pipeline
 
-Wydajny, wielowątkowy system ETL (Extract, Transform, Load) napisany w nowoczesnej Javie 25, zaprojektowany do błyskawicznego przetwarzania i ładowania gigabajtowych plików płaskich (CSV) do relacyjnej bazy danych (PostgreSQL).
+Wydajny, wielowątkowy system ETL (Extract, Transform, Load) napisany w nowoczesnej **Javie 25**, zaprojektowany do błyskawicznego przetwarzania i ładowania gigabajtowych plików płaskich (CSV) do relacyjnej bazy danych (PostgreSQL).
 
-Projekt skupia się na ekstremalnej wydajności wejścia/wyjścia (I/O) poprzez ominięcie standardowych mechanizmów strumieniowania Javy na rzecz bezpośredniego mapowania pamięci (NIO) oraz wykorzystaniu Wątków Wirtualnych (Project Loom) i Strukturalnej Współbieżności (Structured Concurrency) do zrównoleglenia zadań asynchronicznych.
+Projekt skupia się na ekstremalnej wydajności wejścia/wyjścia (I/O). Omija standardowe mechanizmy strumieniowania Javy na rzecz **bezpośredniego mapowania pamięci (NIO)** oraz wykorzystuje **Wątki Wirtualne (Project Loom)** i **Strukturalną Współbieżność** do zrównoleglenia zadań asynchronicznych.
+
+## 🚀 Szybki start (Budowanie i Uruchamienie)
+
+Projekt wykorzystuje narzędzie Maven do zarządzania zależnościami i budowania. Proces kompilacji został skonfigurowany przy użyciu `maven-assembly-plugin`, co pozwala na wygenerowanie w pełni wykonywalnego pliku "Fat JAR" ze wszystkimi zależnościami.
+
+### 1. Budowanie projektu
+Aby zbudować projekt, otwórz terminal w głównym katalogu i uruchom polecenie:
+```bash
+mvn clean package
+```
+
+Skompilowany plik wykonywalny (np. etl-pipeline-jar-with-dependencies.jar) pojawi się w katalogu target/.
+2. Pierwsze uruchomienie i konfiguracja
+
+System został zaprojektowany tak, aby był gotowy do działania (Plug & Play).
+Uruchom wygenerowany plik JAR po raz pierwszy:
+
+```bash
+java --enable-preview -jar target/file_name.jar
+```
+
+Podczas pierwszego uruchomienia, aplikacja automatycznie wygeneruje domyślny plik konfiguracyjny (np. application.properties / config.json).
+
+Kroki konfiguracyjne:
+
+    Otwórz nowo wygenerowany plik konfiguracyjny.
+
+    Uzupełnij dane uwierzytelniające do bazy danych PostgreSQL (URL, użytkownik, hasło).
+
+    Wskaż ścieżkę do folderu, w którym aplikacja ma szukać plików schematów JSON.
+
+    Ważne: Ścieżki do samych plików z danymi (CSV) nie są definiowane globalnie – wskazuje się je bezpośrednio wewnątrz konkretnego pliku schematu JSON.
+
+3. Dane przykładowe (Examples)
+
+Aby ułatwić start, w katalogu examples/ w głównym drzewie projektu umieszczono:
+
+    Przykładowy plik konfiguracyjny schematu .json.
+
+    Kompatybilny z nim testowy plik danych .csv.
+
 🏗️ Architektura Systemu (Pipeline)
 
-System został zaprojektowany zgodnie z zasadą Single Responsibility Principle oraz wzorcem Pipes and Filters. Przepływ danych dzieli się na dwie całkowicie odseparowane fazy, zarządzane przez główny Orkiestrator (DataLoader):
+System został zaprojektowany zgodnie z zasadami Single Responsibility Principle oraz wzorcem Pipes and Filters. Przepływ danych dzieli się na dwie całkowicie odseparowane fazy, zarządzane przez główny Orkiestrator (DataLoader):
 
     Faza I/O (Producent): Niskopoziomowy odczyt z dysku operujący na surowych bajtach i offsetach pamięci.
 
     Faza CPU & DB (Konsument): Konwersja znaków, parsowanie i masowy zapis do bazy danych (JDBC Batch Insert), orkiestrowana przez Wątki Wirtualne.
 
-Dzięki architekturze "Emit & Forget", skaner nigdy nie czeka na bazę danych (chroniony przez system Backpressure), a baza danych otrzymuje ujednolicone paczki danych z maksymalną przepustowością, zabezpieczone przed konfliktami współbieżności.
+Dzięki architekturze "Emit & Forget", Skaner plików nigdy nie czeka na bazę danych, a Orkiestrator zabezpiecza system przed przepełnieniem pamięci przy pomocy mechanizmu Backpressure.
 ⚙️ Kluczowe Rozwiązania Inżynieryjne (Tech Highlights)
-1. Zero-GC Data Scanner (Omijanie Garbage Collectora)
 
-Główna pętla czytająca plik (DataFileScanner) została zaprojektowana w architekturze Zero-GC na gorącej ścieżce. Zamiast tworzyć obiekty String dla każdego słowa i tablice dla każdego wiersza, skaner iteruje po zmapowanych bajtach, nadpisując wyłącznie wskaźniki (typu long) w reużywalnych tablicach o stałym rozmiarze (BATCH_SIZE). Obiekty tworzone są dopiero na etapie paczkowania.
-2. Pamięć Mapowana (NIO MappedByteBuffer)
+    Zero-GC Data Scanner: Główna pętla czytająca (DataFileScanner) unika ciągłego alokowania pamięci na gorącej ścieżce. Zamiast tworzyć tysiące obiektów String, Skaner iteruje po zmapowanych bajtach, nadpisując wyłącznie wskaźniki (typu long) w reużywalnych tablicach (BATCH_SIZE).
 
-Aby uniknąć wąskiego gardła, jakim jest RAM podczas czytania plików po 10 GB+, pliki mapowane są prosto do pamięci wirtualnej w oknach po 1 GB (PAGE_SIZE). Autorski MapMemoryReader potrafi płynnie i bezpiecznie wycinać bajty na styku dwóch gigabajtowych buforów.
-3. Strukturalna Współbieżność i Backpressure
+    Pamięć Mapowana (NIO MappedByteBuffer): Aby uniknąć wąskiego gardła RAM przy plikach 10 GB+, pliki mapowane są bezpośrednio do pamięci wirtualnej w oknach po 1 GB (PAGE_SIZE), z autorską bezpieczną obsługą przesunięć na stykach buforów.
 
-Przetwarzanie pociętych paczek (parsowanie z UTF-8 i wysyłka do bazy) odbywa się w lekkich Wątkach Wirtualnych przy użyciu API StructuredTaskScope. Aby zapobiec zagłodzeniu bazy danych i przepełnieniu RAM-u z powodu ogromnej szybkości Skanera, system używa Semaforów do precyzyjnego zarządzania ciśnieniem (Backpressure), zrównując tempo odczytu z rozmiarem puli połączeń HikariCP.
-4. Izolacja Błędów i Fail-Fast
+    Strukturalna Współbieżność i Backpressure: Przetwarzanie i wysyłka paczek odbywa się w lekkich Wątkach Wirtualnych (StructuredTaskScope). Zastosowanie Semaforów zrównuje tempo odczytu z rozmiarem puli połączeń HikariCP.
 
-System wdraża rygorystyczną strategię Fail-Fast obsługiwaną przez DataLoader. Uszkodzone pliki (np. złe formaty dat, błędy unikalności) przerywają przetwarzanie tylko jednego, izolowanego schematu, pozwalając na płynne ładowanie pozostałych plików. Kody błędów PostgreSQL są w locie tłumaczone na przyjazne komunikaty przez dedykowany SQLStateError Enum.
-5. Ochrona Bazy Danych (Deadlocks & Deduplication)
+    Ochrona bazy przed Deadlockami i Deduplikacja: Przed wysłaniem paczki przez zoptymalizowany sterownik JDBC (reWriteBatchedInserts=true), system wykonuje w pamięci RAM deduplikację za pomocą struktury TreeMap. Sortuje to paczkę po kluczach biznesowych, fizycznie eliminując zakleszczenia wewnątrz PostgreSQL przy równoległych operacjach ON CONFLICT.
 
-Przed wysłaniem paczki do bazy przez zoptymalizowany sterownik JDBC (reWriteBatchedInserts=true), system wykonuje na niej w pamięci RAM deduplikację za pomocą struktury TreeMap. Pozwala to na zachowanie tylko najnowszych rekordów dla danego klucza biznesowego i jednoczesne posortowanie paczki, co fizycznie eliminuje problem zakleszczeń (Deadlocks) wewnątrz PostgreSQL przy równoległych operacjach ON CONFLICT.
-🧩 Główne Komponenty
+    Izolacja Błędów (Fail-Fast): Uszkodzone pliki przerywają przetwarzanie tylko jednego, izolowanego schematu. Kody błędów bazy są w locie tłumaczone z surowego formatu SQLState na czytelne komunikaty biznesowe.
 
-    DataLoader: Główny orkiestrator. Zarządza iteracją po schematach, otwiera StructuredTaskScope, zarządza semaforami przepustowości i izoluje błędy wyjątków bazy danych oraz Skanera.
+📊 Wydajność (Micro-Benchmarking)
 
-    DataFileScanner: Agresywny, niskopoziomowy czytnik plików. Odporny na braki znaków nowej linii na końcu pliku, puste wiersze i ucięte paczki. Przekazuje surowe bloki pamięci do parsowania.
-
-    DataDAO: Uniwersalna warstwa dostępu do danych operująca na wzorcu Strategii. Pozwala na wstrzykiwanie dowolnych zachowań przy zapisie (np. FailFastBatchInsertStrategy).
-
-    MapMemoryReader: Klasa obudowująca logikę wskaźników dla bloków MappedByteBuffer.
-
-    DataBatch (DTO): Niemutowalny rekord transferowy. Stanowi kontrakt między fazą I/O a fazą procesora, przechowując offsety bajtów do bezkolizyjnego parsowania w wątkach.
-
-📊 Benchmarks (Wydajność)
-
-System został poddany testom obciążeniowym na lokalnej infrastrukturze, wykorzystując pulę połączeń HikariCP połączoną z asynchronicznym wczytywaniem NIO.
+System został poddany rygorystycznym testom obciążeniowym na lokalnej infrastrukturze, wykorzystując asynchroniczne I/O oraz zoptymalizowaną pulę HikariCP.
 
 Środowisko testowe:
 
-    Plik 1: pracownicy.csv (1 000 000 wierszy, 6 kolumn)
+    Zbiór danych: pracownicy.csv (1 000 000 wierszy, 6 kolumn) + books.csv (300 000 wierszy, 3 kolumny).
 
-    Plik 2: books.csv (300 000 wierszy, 3 kolumny)
+    Łączny wolumen: 1.3 miliona wierszy (prawie 7 milionów analizowanych komórek danych).
 
-    Łączny wolumen: 1.3 miliona wierszy (prawie 7 milionów komórek danych).
-
-    Strategia: Wątki Wirtualne + BATCH_SIZE = 1000 + Limit puli/Semafora = 15.
+    Konfiguracja: Wątki Wirtualne + BATCH_SIZE = 1000 + Max Pool Size = 15.
 
 Wynik:
-Całkowity czas wykonania programu (wczytanie I/O -> parsowanie -> tłumaczenie JDBC -> zapis na dysku bazy z obsługą indeksów) wyniósł średnio 3.3 - 4.0 sekundy.
-Daje to przepustowość na poziomie około 390 000 wierszy na sekundę.
+Całkowity czas wykonania programu (wczytanie I/O ➔ parsowanie UTF-8 ➔ translacja JDBC ➔ fizyczny zapis na dysku bazy z obsługą indeksów B-Tree) wynosi średnio 3.3 - 4.0 sekundy.
+Osiągnięta przepustowość to około 390 000 przetworzonych wierszy na sekundę.
+🗺️ Status Projektu i Plany Rozwoju (Roadmap)
 
-(W planach: Szczegółowy Micro-Benchmarking izolujący czasy samego Skanera, Parserów Wątków i operacji Network I/O bazy danych).
+Obecna architektura jest stabilna, przetestowana i gotowa do pracy (Feature Complete).
 
-🚀 Status Projektu
+Zrealizowano:
 
-    [x] Silnik I/O (Mapowanie pamięci)
+    [x] Silnik wejścia/wyjścia z użyciem pamięci mapowanej (NIO).
 
-    [x] Skaner NIO z architekturą Zero-GC
+    [x] Skaner w architekturze Zero-GC.
 
-    [x] Implementacja Wątków Wirtualnych i Backpressure
+    [x] Wdrożenie Wątków Wirtualnych i zarządzanie ciśnieniem (Backpressure).
 
-    [x] Deduplikacja paczek i eliminacja Deadlocków
+    [x] Własny Orkiestrator (DataLoader) izolujący awarie.
 
-    [x] Tłumaczenie błędów SQLState
+    [x] Deduplikacja paczek i strukturalna ochrona przed zakleszczeniami bazy danych (Deadlocks).
 
-    [ ] Roadmap: Row-Level Fallback Strategy
+    [x] Automatyczne mapowanie kodów SQLState.
 
-    [ ] Roadmap: Obsługa Advanced Column Constraints (Regex/Min/Max)
+    [x] Skrypty budujące system (Maven Assembly).
+
+Future Updates (W planach):
+
+    [ ] Row-Level Fallback Strategy: Przełączanie systemu w tryb izolowania pojedynczych błędnych wierszy w przypadku awarii całej paczki, zamiast jej całkowitego odrzucania.
+
+    [ ] Advanced Column Constraints: Obsługa zaawansowanych obostrzeń walidacyjnych aplikacji (np. wymuszanie wzorców Regex, walidacja zakresów min/max) zdefiniowanych na poziomie schematów JSON.

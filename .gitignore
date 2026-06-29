@@ -21,6 +21,10 @@ out/
 *.log
 *.csv
 data/
+*.txt
+
+# SCHEMAS
+/schemas
 
 # System 
 .DS_Store

@@ -17,7 +17,9 @@ import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class Application {
 
@@ -85,7 +87,7 @@ public class Application {
         dataLoader.loadData();
         long end = System.currentTimeMillis();
 
-        System.out.println("ŁADOWANEI ZAJEŁA: " + (end - start));
+        System.out.println("Loading time: " + (end - start) + " ms");
     }
 
     private void showSchemasList() {
