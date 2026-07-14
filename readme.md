@@ -1,107 +1,130 @@
-# 🚀 High-Performance Java ETL Pipeline
+# ETL Pipeline using Java NIO, Virtual Threads and JDBC Batch Processing
 
-Wydajny, wielowątkowy system ETL (Extract, Transform, Load) napisany w nowoczesnej **Javie 25**, zaprojektowany do błyskawicznego przetwarzania i ładowania gigabajtowych plików płaskich (CSV) do relacyjnej bazy danych (PostgreSQL).
+Projekt ETL napisany w **Java 25**, służący do wydajnego przetwarzania plików CSV i zapisywania danych do bazy **PostgreSQL**.
 
-Projekt skupia się na ekstremalnej wydajności wejścia/wyjścia (I/O). Omija standardowe mechanizmy strumieniowania Javy na rzecz **bezpośredniego mapowania pamięci (NIO)** oraz wykorzystuje **Wątki Wirtualne (Project Loom)** i **Strukturalną Współbieżność** do zrównoleglenia zadań asynchronicznych.
+Głównym celem projektu było sprawdzenie, jak daleko można zoptymalizować proces odczytu i ładowania dużych plików przy użyciu nowoczesnych funkcji Javy, takich jak **NIO (Memory Mapped Files)**, **Virtual Threads (Project Loom)** oraz **JDBC Batch Processing**.
 
-## 🚀 Szybki start (Budowanie i Uruchamienie)
+Projekt został napisany głównie w celach edukacyjnych, aby lepiej zrozumieć niskopoziomowe operacje I/O, współbieżność oraz komunikację z bazą danych bez użycia frameworków.
 
-Projekt wykorzystuje narzędzie Maven do zarządzania zależnościami i budowania. Proces kompilacji został skonfigurowany przy użyciu `maven-assembly-plugin`, co pozwala na wygenerowanie w pełni wykonywalnego pliku "Fat JAR" ze wszystkimi zależnościami.
+---
 
-### 1. Budowanie projektu
-Aby zbudować projekt, otwórz terminal w głównym katalogu i uruchom polecenie:
+# 🚀 Quick Start
+
+## Build
+
 ```bash
 mvn clean package
 ```
 
-Skompilowany plik wykonywalny (np. etl-pipeline-jar-with-dependencies.jar) pojawi się w katalogu target/.
-2. Pierwsze uruchomienie i konfiguracja
+Po zakończeniu kompilacji plik JAR zostanie utworzony w katalogu `target/`.
 
-System został zaprojektowany tak, aby był gotowy do działania (Plug & Play).
-Uruchom wygenerowany plik JAR po raz pierwszy:
+## Run
 
 ```bash
 java --enable-preview -jar target/file_name.jar
 ```
 
-Podczas pierwszego uruchomienia, aplikacja automatycznie wygeneruje domyślny plik konfiguracyjny (np. application.properties / config.json).
+Przy pierwszym uruchomieniu aplikacja automatycznie wygeneruje domyślny plik konfiguracyjny.
 
-Kroki konfiguracyjne:
+Następnie wystarczy:
 
-    Otwórz nowo wygenerowany plik konfiguracyjny.
+- uzupełnić dane połączenia z PostgreSQL,
+- wskazać katalog z plikami schematów JSON.
 
-    Uzupełnij dane uwierzytelniające do bazy danych PostgreSQL (URL, użytkownik, hasło).
+Ścieżki do plików CSV definiowane są bezpośrednio w odpowiednim pliku schematu.
 
-    Wskaż ścieżkę do folderu, w którym aplikacja ma szukać plików schematów JSON.
+---
 
-    Ważne: Ścieżki do samych plików z danymi (CSV) nie są definiowane globalnie – wskazuje się je bezpośrednio wewnątrz konkretnego pliku schematu JSON.
+# 📂 Example
 
-3. Dane przykładowe (Examples)
+W katalogu `examples/` znajdują się przykładowe pliki:
 
-Aby ułatwić start, w katalogu examples/ w głównym drzewie projektu umieszczono:
+- przykładowy schemat JSON,
+- przykładowy plik CSV zgodny ze schematem.
 
-    Przykładowy plik konfiguracyjny schematu .json.
+---
 
-    Kompatybilny z nim testowy plik danych .csv.
+# 🏗️ Architecture
 
-🏗️ Architektura Systemu (Pipeline)
+Pipeline został podzielony na dwa niezależne etapy:
 
-System został zaprojektowany zgodnie z zasadami Single Responsibility Principle oraz wzorcem Pipes and Filters. Przepływ danych dzieli się na dwie całkowicie odseparowane fazy, zarządzane przez główny Orkiestrator (DataLoader):
+```text
+CSV
+ │
+ ▼
+Memory Mapped Scanner
+ │
+ ▼
+Parser
+ │
+ ▼
+Batch Builder
+ │
+ ▼
+JDBC Batch Insert
+ │
+ ▼
+PostgreSQL
+```
 
-    Faza I/O (Producent): Niskopoziomowy odczyt z dysku operujący na surowych bajtach i offsetach pamięci.
+Odczyt danych odpowiada wyłącznie za pobieranie danych z dysku, natomiast przetwarzanie oraz zapis do bazy wykonywane są równolegle przy użyciu Virtual Threads.
 
-    Faza CPU & DB (Konsument): Konwersja znaków, parsowanie i masowy zapis do bazy danych (JDBC Batch Insert), orkiestrowana przez Wątki Wirtualne.
+Takie rozdzielenie upraszcza odpowiedzialności poszczególnych komponentów i pozwala efektywnie wykorzystać zasoby systemu.
 
-Dzięki architekturze "Emit & Forget", Skaner plików nigdy nie czeka na bazę danych, a Orkiestrator zabezpiecza system przed przepełnieniem pamięci przy pomocy mechanizmu Backpressure.
-⚙️ Kluczowe Rozwiązania Inżynieryjne (Tech Highlights)
+---
 
-    Zero-GC Data Scanner: Główna pętla czytająca (DataFileScanner) unika ciągłego alokowania pamięci na gorącej ścieżce. Zamiast tworzyć tysiące obiektów String, Skaner iteruje po zmapowanych bajtach, nadpisując wyłącznie wskaźniki (typu long) w reużywalnych tablicach (BATCH_SIZE).
+# ⚙️ Implementation Details
 
-    Pamięć Mapowana (NIO MappedByteBuffer): Aby uniknąć wąskiego gardła RAM przy plikach 10 GB+, pliki mapowane są bezpośrednio do pamięci wirtualnej w oknach po 1 GB (PAGE_SIZE), z autorską bezpieczną obsługą przesunięć na stykach buforów.
+Projekt wykorzystuje kilka rozwiązań, które miały na celu poprawę wydajności:
 
-    Strukturalna Współbieżność i Backpressure: Przetwarzanie i wysyłka paczek odbywa się w lekkich Wątkach Wirtualnych (StructuredTaskScope). Zastosowanie Semaforów zrównuje tempo odczytu z rozmiarem puli połączeń HikariCP.
+- odczyt plików przez **Memory Mapped Files (Java NIO)**,
+- **Virtual Threads** do równoległego przetwarzania batchy,
+- **JDBC Batch Inserts** do ograniczenia liczby operacji na bazie,
+- kontrolę liczby równoległych zadań przy pomocy semaforów,
+- deduplikację rekordów przed zapisem,
+- własną obsługę wyjątków oraz mapowanie kodów SQLState na bardziej czytelne komunikaty.
 
-    Ochrona bazy przed Deadlockami i Deduplikacja: Przed wysłaniem paczki przez zoptymalizowany sterownik JDBC (reWriteBatchedInserts=true), system wykonuje w pamięci RAM deduplikację za pomocą struktury TreeMap. Sortuje to paczkę po kluczach biznesowych, fizycznie eliminując zakleszczenia wewnątrz PostgreSQL przy równoległych operacjach ON CONFLICT.
+---
 
-    Izolacja Błędów (Fail-Fast): Uszkodzone pliki przerywają przetwarzanie tylko jednego, izolowanego schematu. Kody błędów bazy są w locie tłumaczone z surowego formatu SQLState na czytelne komunikaty biznesowe.
+# 📊 Performance
 
-📊 Wydajność (Micro-Benchmarking)
+Projekt został przetestowany lokalnie na zestawie:
 
-System został poddany rygorystycznym testom obciążeniowym na lokalnej infrastrukturze, wykorzystując asynchroniczne I/O oraz zoptymalizowaną pulę HikariCP.
+- **1 000 000** rekordów (`employees.csv`),
+- **300 000** rekordów (`books.csv`).
 
-Środowisko testowe:
+Łącznie około **1,3 mln rekordów**.
 
-    Zbiór danych: pracownicy.csv (1 000 000 wierszy, 6 kolumn) + books.csv (300 000 wierszy, 3 kolumny).
+Konfiguracja testowa:
 
-    Łączny wolumen: 1.3 miliona wierszy (prawie 7 milionów analizowanych komórek danych).
+- Java 25
+- Virtual Threads
+- Batch Size = 1000
+- HikariCP Pool Size = 15
 
-    Konfiguracja: Wątki Wirtualne + BATCH_SIZE = 1000 + Max Pool Size = 15.
+Średni czas wykonania:
 
-Wynik:
-Całkowity czas wykonania programu (wczytanie I/O ➔ parsowanie UTF-8 ➔ translacja JDBC ➔ fizyczny zapis na dysku bazy z obsługą indeksów B-Tree) wynosi średnio 3.3 - 4.0 sekundy.
-Osiągnięta przepustowość to około 390 000 przetworzonych wierszy na sekundę.
-🗺️ Status Projektu i Plany Rozwoju (Roadmap)
+- **3.3–4.0 s**
 
-Obecna architektura jest stabilna, przetestowana i gotowa do pracy (Feature Complete).
+Przepustowość:
 
-Zrealizowano:
+- **około 390 000 rekordów/s**
 
-    [x] Silnik wejścia/wyjścia z użyciem pamięci mapowanej (NIO).
+---
 
-    [x] Skaner w architekturze Zero-GC.
+# ✅ Roadmap
 
-    [x] Wdrożenie Wątków Wirtualnych i zarządzanie ciśnieniem (Backpressure).
+## Done
 
-    [x] Własny Orkiestrator (DataLoader) izolujący awarie.
+- ✅ Memory Mapped File Scanner
+- ✅ JDBC Batch Inserts
+- ✅ Virtual Threads
+- ✅ Backpressure
+- ✅ Batch deduplication
+- ✅ SQLState error mapping
 
-    [x] Deduplikacja paczek i strukturalna ochrona przed zakleszczeniami bazy danych (Deadlocks).
+## Planned
 
-    [x] Automatyczne mapowanie kodów SQLState.
-
-    [x] Skrypty budujące system (Maven Assembly).
-
-Future Updates (W planach):
-
-    [ ] Row-Level Fallback Strategy: Przełączanie systemu w tryb izolowania pojedynczych błędnych wierszy w przypadku awarii całej paczki, zamiast jej całkowitego odrzucania.
-
-    [ ] Advanced Column Constraints: Obsługa zaawansowanych obostrzeń walidacyjnych aplikacji (np. wymuszanie wzorców Regex, walidacja zakresów min/max) zdefiniowanych na poziomie schematów JSON.
+- ⏳ Row-level fallback dla błędnych rekordów
+- ⏳ Dodatkowe reguły walidacji kolumn w schematach JSON
+- ⏳ Testy jednostkowe
