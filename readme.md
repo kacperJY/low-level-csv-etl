@@ -1,58 +1,26 @@
-# ETL Pipeline using Java NIO, Virtual Threads and JDBC Batch Processing
+# ETL Pipeline with Java NIO, Virtual Threads, and JDBC Batch Processing
 
-Projekt ETL napisany w **Java 25**, służący do wydajnego przetwarzania plików CSV i zapisywania danych do bazy **PostgreSQL**.
+A Java 25 ETL application for reading CSV files, processing records concurrently, and loading data into PostgreSQL.
 
-Głównym celem projektu było sprawdzenie, jak daleko można zoptymalizować proces odczytu i ładowania dużych plików przy użyciu nowoczesnych funkcji Javy, takich jak **NIO (Memory Mapped Files)**, **Virtual Threads (Project Loom)** oraz **JDBC Batch Processing**.
+The project was created as a learning exercise focused on low-level file I/O, concurrency, and direct database access without application frameworks.
 
-Projekt został napisany głównie w celach edukacyjnych, aby lepiej zrozumieć niskopoziomowe operacje I/O, współbieżność oraz komunikację z bazą danych bez użycia frameworków.
+## Tech Stack
 
----
+- Java 25
+- Java NIO Memory-Mapped Files
+- Virtual Threads
+- JDBC Batch Processing
+- PostgreSQL
+- HikariCP
+- Maven
 
-# 🚀 Quick Start
-
-## Build
-
-```bash
-mvn clean package
-```
-
-Po zakończeniu kompilacji plik JAR zostanie utworzony w katalogu `target/`.
-
-## Run
-
-```bash
-java --enable-preview -jar target/file_name.jar
-```
-
-Przy pierwszym uruchomieniu aplikacja automatycznie wygeneruje domyślny plik konfiguracyjny.
-
-Następnie wystarczy:
-
-- uzupełnić dane połączenia z PostgreSQL,
-- wskazać katalog z plikami schematów JSON.
-
-Ścieżki do plików CSV definiowane są bezpośrednio w odpowiednim pliku schematu.
-
----
-
-# 📂 Example
-
-W katalogu `examples/` znajdują się przykładowe pliki:
-
-- przykładowy schemat JSON,
-- przykładowy plik CSV zgodny ze schematem.
-
----
-
-# 🏗️ Architecture
-
-Pipeline został podzielony na dwa niezależne etapy:
+## How It Works
 
 ```text
 CSV
  │
  ▼
-Memory Mapped Scanner
+Memory-Mapped Scanner
  │
  ▼
 Parser
@@ -67,64 +35,83 @@ JDBC Batch Insert
 PostgreSQL
 ```
 
-Odczyt danych odpowiada wyłącznie za pobieranie danych z dysku, natomiast przetwarzanie oraz zapis do bazy wykonywane są równolegle przy użyciu Virtual Threads.
+The file-reading stage retrieves data from disk, while parsing, batch processing, and database writes are performed concurrently using Virtual Threads.
 
-Takie rozdzielenie upraszcza odpowiedzialności poszczególnych komponentów i pozwala efektywnie wykorzystać zasoby systemu.
+The implementation includes:
 
----
+- memory-mapped file access,
+- JDBC batch inserts,
+- semaphore-based concurrency limits,
+- backpressure,
+- record deduplication before database insertion,
+- custom exception handling,
+- SQLState mapping for more readable database error messages.
 
-# ⚙️ Implementation Details
+## Build and Run
 
-Projekt wykorzystuje kilka rozwiązań, które miały na celu poprawę wydajności:
+### Build
 
-- odczyt plików przez **Memory Mapped Files (Java NIO)**,
-- **Virtual Threads** do równoległego przetwarzania batchy,
-- **JDBC Batch Inserts** do ograniczenia liczby operacji na bazie,
-- kontrolę liczby równoległych zadań przy pomocy semaforów,
-- deduplikację rekordów przed zapisem,
-- własną obsługę wyjątków oraz mapowanie kodów SQLState na bardziej czytelne komunikaty.
+```bash
+mvn clean package
+```
 
----
+After the build is complete, the JAR file will be available in the `target/` directory.
 
-# 📊 Performance
+### Run
 
-Projekt został przetestowany lokalnie na zestawie:
+```bash
+java --enable-preview -jar target/file_name.jar
+```
 
-- **1 000 000** rekordów (`employees.csv`),
-- **300 000** rekordów (`books.csv`).
+On the first run, the application creates a default configuration file.
 
-Łącznie około **1,3 mln rekordów**.
+Configure:
 
-Konfiguracja testowa:
+- PostgreSQL connection details,
+- the directory containing JSON schema files.
 
-- Java 25
+CSV file paths are defined in the corresponding schema files.
+
+The `examples/` directory contains an example JSON schema and a matching CSV file.
+
+## Local Performance Results
+
+The application was tested locally with approximately **1.3 million records**:
+
+- **1,000,000** records from `employees.csv`,
+- **300,000** records from `books.csv`.
+
+Observed results:
+
+- execution time: **3.3–4.0 seconds**,
+- throughput: approximately **390,000 records per second**.
+
+These results were measured in a local environment and may vary depending on the hardware, Docker and PostgreSQL configuration, storage performance, file structure, and input data.
+
+## Benchmark Environment
+
+- CPU: Intel Core Ultra 5 125H
+- RAM: 16 GB LPDDR5x, 4800 MHz
+- Storage: 1 TB M.2 PCIe SSD
+- Operating system: Ubuntu 24 LTS
+- Java: 25
+- PostgreSQL: running in a Docker container
+- Batch size: 1000
+- HikariCP pool size: 15
+
+## Roadmap
+
+### Completed
+
+- Memory-Mapped File Scanner
+- JDBC Batch Inserts
 - Virtual Threads
-- Batch Size = 1000
-- HikariCP Pool Size = 15
+- Backpressure
+- Batch deduplication
+- SQLState error mapping
 
-Średni czas wykonania:
+### Planned
 
-- **3.3–4.0 s**
-
-Przepustowość:
-
-- **około 390 000 rekordów/s**
-
----
-
-# ✅ Roadmap
-
-## Done
-
-- ✅ Memory Mapped File Scanner
-- ✅ JDBC Batch Inserts
-- ✅ Virtual Threads
-- ✅ Backpressure
-- ✅ Batch deduplication
-- ✅ SQLState error mapping
-
-## Planned
-
-- ⏳ Row-level fallback dla błędnych rekordów
-- ⏳ Dodatkowe reguły walidacji kolumn w schematach JSON
-- ⏳ Testy jednostkowe
+- Row-level fallback for invalid records
+- Additional column validation rules in JSON schemas
+- Unit tests
