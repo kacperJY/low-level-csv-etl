@@ -47,6 +47,31 @@ The implementation includes:
 - custom exception handling,
 - SQLState mapping for more readable database error messages.
 
+## Memory and Allocation
+
+The pipeline separates allocation-free scanning from allocation-heavy parsing.
+
+**Scanning (one thread, no per-row allocations)**
+
+- The file is memory-mapped in 1 GB windows, because `MappedByteBuffer` is indexed by `int` and cannot address a larger region at once.
+- Bytes are read through a single reused 4 KB buffer.
+- Row boundaries and separator positions are stored as offsets in reused `long[]` arrays. No objects are created per row or per field while scanning.
+
+**Batch hand-off (one set of allocations per 1,000 rows)**
+
+- When a batch is full, its bytes and offset arrays are copied into a new `DataBatch`.
+- The copy is deliberate: each worker owns its data, so the scanner can keep reusing its buffers without sharing mutable state between threads.
+
+**Parsing and loading (worker Virtual Threads)**
+
+- Each field becomes a `String` and each row a `String[]`, which are bound with `setObject` in the JDBC batch. This is where most of the allocation happens.
+- A semaphore limits the number of batches in flight to 15, matching the HikariCP pool size. The scanner blocks before submitting the next batch, which applies backpressure and keeps memory usage bounded.
+
+**Possible improvements**
+
+- Loading data with PostgreSQL `COPY` (`CopyManager`) instead of batched `INSERT` statements.
+- Parsing numeric columns directly from bytes to avoid intermediate `String` objects.
+
 ## Build and Run
 
 ### Build
